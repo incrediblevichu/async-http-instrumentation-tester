@@ -44,6 +44,18 @@ The tool itself does **not** read spans or compare them. You read the result in 
 | `springWebClient` | Spring `WebClient` (Reactor Netty) | `Mono.subscribe` |
 | `jetty` | Jetty `HttpClient` | `send(Response.CompleteListener)` |
 
+## Screenshots
+
+The UI before a run. Pick a client, then set the number of requests and the number of concurrent workers:
+
+![UI before a run](docs/images/ui-initial.png)
+
+After a run of 500 requests from 20 workers through the OkHttp client. The counters show how many requests the tester sent and got a response for:
+
+![UI after a run](docs/images/ui-completed.png)
+
+These screenshots show the tester's own UI only. They do not show the trace comparison, which you do in your tracing backend.
+
 ## Requirements
 
 - Java 17
