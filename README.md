@@ -29,7 +29,8 @@ The tool itself does **not** read spans or compare them. You read the result in 
 
 ## Features
 
-- **Web UI** at `/` where you choose a client, the number of requests (1 to 1000) and the number of concurrent workers (1 to 50). It sends the request numbers `1..N` in random order, spread across the workers, and shows success and failure counts and the average time.
+- **Web UI** at `/` where you choose a client, the target URL, the number of requests (1 to 1000) and the number of concurrent workers (1 to 50). It sends the request numbers `1..N` in random order, spread across the workers, and shows success and failure counts and the average time.
+- **Your own target URL.** Set the outbound URL in the UI, through the API, or at startup, so the calls go to your own service.
 - **Pluggable clients.** Each client is a Spring component. Add one class and it appears in the UI automatically. The UI reads the list from the server, so it needs no rebuild.
 - **Self-contained.** Outbound calls go to a built-in `/external/{i}` endpoint by default, so no third-party site is involved.
 
@@ -46,11 +47,15 @@ The tool itself does **not** read spans or compare them. You read the result in 
 
 ## Screenshots
 
-The UI before a run. Pick a client, then set the number of requests and the number of concurrent workers:
+The UI before a run. It starts with the default target URL. Pick a client, then set the number of requests and the number of concurrent workers:
 
 ![UI before a run](docs/images/ui-initial.png)
 
-After a run of 500 requests from 20 workers through the OkHttp client. The counters show how many requests the tester sent and got a response for:
+With a custom target URL typed in. **Apply** sends it to the server, **Reset to default** restores the URL the application started with, and pressing **Fire** applies a changed URL first:
+
+![UI with a custom target URL](docs/images/ui-custom-url.png)
+
+After a run of 300 requests from 20 workers through the OkHttp client to a custom target. The counters show how many requests the tester sent and got a response for:
 
 ![UI after a run](docs/images/ui-completed.png)
 
@@ -92,6 +97,25 @@ Example: `java -jar app.jar --wizoz.exit-url=http://my-service:8080/external/`
 
 If you point the exit URL at another service, it must accept `GET {exitUrl}{i}`.
 
+### Setting your own target URL
+
+You can change the URL while the application is running, in any of these ways:
+
+- **In the UI.** Type it in the **Target URL** box and press **Apply**, or just press **Fire**.
+- **Through the API:**
+  ```bash
+  curl -X POST http://localhost:12345/api/wizOzManagement/setDestinationUrl \
+       -H 'Content-Type: application/json' \
+       -d '{"url": "http://my-service:8080/hook/"}'
+  ```
+- **At startup**, with `--wizoz.exit-url=...` as shown above.
+
+The URL must be an absolute `http` or `https` URL with a host, and it must not contain a query string or a fragment, because the number is appended to the end of the path. A trailing `/` is added if you leave it out. Anything else is rejected with HTTP 400 and a message, and the previous URL stays in use.
+
+The change applies to the next request, and it is kept in memory only. Restarting the application goes back to the startup value. **Reset to default** in the UI, or `POST /api/wizOzManagement/resetDestinationUrl`, restores that value without a restart.
+
+The URL is shared by everyone using the application. There is no authentication, so run the tester only on a network you trust.
+
 ## API
 
 | Endpoint | Purpose |
@@ -99,6 +123,8 @@ If you point the exit URL at another service, it must accept `GET {exitUrl}{i}`.
 | `GET /api/fireRequest/{clientType}/{correlationId}` | Fire one async request. Returns 200, or 404 if the client key is unknown |
 | `GET /api/wizOzManagement/getAvailableClients` | Registered clients (key and display name) |
 | `GET /api/wizOzManagement/getDestinationUrl` | The exit URL in use |
+| `POST /api/wizOzManagement/setDestinationUrl` | Set the exit URL. Body `{"url": "..."}`. Returns the URL now in use, or 400 with `{"message": "..."}` |
+| `POST /api/wizOzManagement/resetDestinationUrl` | Restore the URL the application started with |
 | `GET /external/{correlationId}` | Default exit target. Returns the number |
 
 ```bash
@@ -136,14 +162,29 @@ The key (`myClient`) is what you pass in `/api/fireRequest/{clientType}/{i}`.
 mvn test
 ```
 
-The tests check the tester itself, not any tracer. For every registered client, 200 request numbers are fired from 16 threads, and each number must reach the exit endpoint exactly once. They also cover the default exit URL, client registration and the 404 for an unknown client.
+The tests check the tester itself, not any tracer. For every registered client, 200 request numbers are fired from 16 threads, and each number must reach the exit endpoint exactly once. They also cover the default exit URL, client registration, the 404 for an unknown client, and changing, validating and resetting the target URL.
+
+## Building the UI
+
+The UI is a React app in [`ui/`](ui). The compiled build is already committed in `src/main/resources/static`, so you only need this to change the UI:
+
+```bash
+cd ui
+npm install
+npm run build
+rm -rf ../src/main/resources/static/static ../src/main/resources/static/index.html ../src/main/resources/static/asset-manifest.json
+cp -R build/. ../src/main/resources/static/
+```
+
+For development, run the Java application and then `npm start` in `ui/`. The dev server proxies `/api` requests to port 12345.
 
 ## Limitations
 
 - A run only exercises the clients and load you choose. A run with no mismatch shows no problem for that case, not that propagation is correct everywhere.
 - Crossed context is more likely at higher concurrency. A small request count can pass by luck.
 - Results are read from your tracing backend. There is no built-in span comparison.
-- The UI is distributed as a compiled bundle in `src/main/resources/static`. Its source is not in this repository.
+- The target URL is global to the running application, not per user, and it has no authentication.
+- The UI source in `ui/` was recovered from the source map of the earlier compiled bundle, then extended. It keeps the original behavior and adds the editable target URL.
 - On macOS, Reactor Netty may log a harmless `MacOSDnsServerAddressStreamProvider` error at startup. It falls back to the system DNS resolver.
 
 ## License

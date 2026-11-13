@@ -26,6 +26,24 @@ public interface WizOzHttpClientService {
 	String getExitUrl();
 
 	/**
+	 * Changes the base URL that outbound requests are sent to. Takes effect for the next request.
+	 *
+	 * @param exitUrl absolute http or https URL. A trailing "/" is added if missing. The correlation id is appended
+	 *                to it, so it should end with a path that accepts one more segment
+	 * @return the URL now in use
+	 * @throws com.wizoz.async.tester.service.InvalidExitUrlException if the URL is not an absolute http(s) URL
+	 */
+	String setExitUrl(String exitUrl);
+
+	/**
+	 * Restores the exit URL that was configured at startup (property {@code wizoz.exit-url}, or the built-in
+	 * local endpoint).
+	 *
+	 * @return the URL now in use
+	 */
+	String resetExitUrl();
+
+	/**
 	 * @return map of client key to its display name
 	 */
 	Map<String, String> getAvailableClients();

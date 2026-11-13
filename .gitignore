@@ -6,3 +6,5 @@ target/
 .classpath
 .project
 .settings/
+node_modules/
+ui/build/
