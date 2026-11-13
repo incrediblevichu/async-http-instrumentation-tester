@@ -5,73 +5,51 @@ import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import com.wizoz.async.tester.client.async.WizOzAsyncClient;
+import com.wizoz.async.tester.service.UnknownClientException;
 import com.wizoz.async.tester.service.WizOzHttpClientService;
 
 @Service
 public class WizOzHttpClientServiceImpl implements WizOzHttpClientService {
-	
-	/**
-	 * 
-	 */
+
 	private static final Logger log = LoggerFactory.getLogger(WizOzHttpClientServiceImpl.class);
 
 	/**
-	 * 
+	 * All registered clients, keyed by bean name. Spring injects every {@link WizOzAsyncClient} bean, which is how
+	 * a new client shows up without any other change.
 	 */
 	private final Map<String, WizOzAsyncClient> clientMap;
-	
-	/**
-	 * 
-	 */
-	private String exitUrl = DEFAULT_EXIT_URL;
-	
-	/**
-	 * 
-	 * @param clientMap
-	 */
-	public WizOzHttpClientServiceImpl(Map<String, WizOzAsyncClient> clientMap) {
+
+	private final String exitUrl;
+
+	public WizOzHttpClientServiceImpl(Map<String, WizOzAsyncClient> clientMap,
+			@Value("${wizoz.exit-url:http://localhost:${server.port:12345}/external/}") String exitUrl) {
 		this.clientMap = clientMap;
+		this.exitUrl = exitUrl.endsWith("/") ? exitUrl : exitUrl + "/";
 	}
-	
-	
+
 	@Override
 	public String getExitUrl() {
 		return exitUrl;
 	}
-	
-	
-	
-	/**
-	 * 
-	 */
+
 	@Override
 	public void fireRequest(String clientType, int correlationId) {
 		WizOzAsyncClient asyncClient = clientMap.get(clientType);
-		if(null == asyncClient) {
-			//TODO: throw an exception here and handle it centrally
-			log.error("Could not find async client for client type : " + clientType);
-			return;
+		if (asyncClient == null) {
+			throw new UnknownClientException(clientType);
 		}
-		log.info("Using async client" + asyncClient.getClientGenericName());
-		asyncClient.sendAsyncRequest(WizOzHttpClientService.DEFAULT_EXIT_URL+correlationId);
+		log.debug("Using async client {} for correlation id {}", asyncClient.getClientGenericName(), correlationId);
+		asyncClient.sendAsyncRequest(exitUrl + correlationId);
 	}
-
-
-	/**
-	 * 
-	 */
-	@Override
-	public void setExitUrl(String exitUrl) {
-		this.exitUrl = exitUrl;
-	}
-
 
 	@Override
 	public Map<String, String> getAvailableClients() {
-		return clientMap.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, e->e.getValue().getClientGenericName()));
+		return clientMap.entrySet().stream()
+				.collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getClientGenericName()));
 	}
 
 }

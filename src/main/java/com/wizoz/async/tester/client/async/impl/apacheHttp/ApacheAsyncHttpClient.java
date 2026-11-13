@@ -31,7 +31,7 @@ public class ApacheAsyncHttpClient implements WizOzAsyncClient {
 		httpClient.execute(request, new FutureCallback<SimpleHttpResponse>() {
 			@Override
 			public void completed(SimpleHttpResponse response) {
-				log.info("HTTP {} Response: {}", response.getCode(), response.getBodyText());
+				log.debug("HTTP {} Response: {}", response.getCode(), response.getBodyText());
 			}
 
 			@Override

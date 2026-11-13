@@ -48,7 +48,7 @@ public class VertXAsyncClient implements WizOzAsyncClient {
         .as(BodyCodec.string())
         .send()
         .onSuccess(response -> {
-            log.info("HTTP {} Response: {}", response.statusCode(), response.body());
+            log.debug("HTTP {} Response: {}", response.statusCode(), response.body());
         })
         .onFailure(err -> {
             log.error("HTTP call failed: {}", err.getMessage(), err);

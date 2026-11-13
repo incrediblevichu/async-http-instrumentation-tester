@@ -3,42 +3,31 @@ package com.wizoz.async.tester.service;
 import java.util.Map;
 
 /**
- * 
- * @author Vijay k
+ * Fires asynchronous HTTP requests through the registered {@link com.wizoz.async.tester.client.async.WizOzAsyncClient}
+ * implementations.
  *
+ * @author Vijay k
  */
 public interface WizOzHttpClientService {
-	
+
 	/**
-	 * 
-	 * @param clientType
-	 * @param correlationId
+	 * Fires one asynchronous request. The outbound request goes to {@link #getExitUrl()} followed by the
+	 * correlation id.
+	 *
+	 * @param clientType    key of the client (the bean name, as returned by {@link #getAvailableClients()})
+	 * @param correlationId number that identifies this request end to end
+	 * @throws com.wizoz.async.tester.service.UnknownClientException if no client is registered under that key
 	 */
-	public void fireRequest(String clientType, int correlationId);
-	
+	void fireRequest(String clientType, int correlationId);
+
 	/**
-	 * 
+	 * @return the base URL that outbound requests are sent to. Always ends with "/".
 	 */
-	public String DEFAULT_EXIT_URL = "https://www.google.com/";
-	
+	String getExitUrl();
+
 	/**
-	 * 
-	 * @return
+	 * @return map of client key to its display name
 	 */
-	default public String getExitUrl() {
-		return DEFAULT_EXIT_URL;
-	}
-	
-	/**
-	 * 
-	 * @param exitUrl
-	 */
-	public void setExitUrl(String exitUrl);
-	
-	
-	/**
-	 * 
-	 */
-	public Map<String, String> getAvailableClients();
+	Map<String, String> getAvailableClients();
 
 }

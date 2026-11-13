@@ -1,93 +1,143 @@
-# wizOzAsyncTester
+# async-http-instrumentation-tester
 
+A small test harness for checking that **trace context survives asynchronous HTTP calls**.
 
+APM agents and tracing libraries propagate trace context across threads. Async HTTP clients are where this breaks most often: a callback runs on a different thread, and the context is lost or attached to the wrong request. These bugs depend on timing, so they are hard to reproduce and hard to confirm.
 
-## Getting started
+This tool makes them easy to spot by giving every request its own number.
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+## How it works
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
-
-## Add your files
-
-* [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+Each test request carries a number `i`:
 
 ```
-cd existing_repo
-git remote add origin https://gitlab.com/incrediblevichu/wizozasynctester.git
-git branch -M main
-git push -uf origin main
+inbound:   GET /api/fireRequest/{clientType}/{i}     entry span, correlation id = i
+outbound:  GET {exitUrl}{i}                          exit span, made by the async client
 ```
 
-## Integrate with your tools
+The application receives inbound request `i` and makes an asynchronous outbound call for the same `i`. If trace context is propagated correctly, the entry span for `i` and the exit span for `i` belong to the same trace.
 
-* [Set up project integrations](https://gitlab.com/incrediblevichu/wizozasynctester/-/settings/integrations)
+| What you see in your tracing backend | What it means |
+|---|---|
+| Exit span `j` in the trace of entry `i`, where `i ≠ j` | Context was **crossed** between requests (thread reuse or hop bug) |
+| Exit span `i` with no parent, or in a separate trace | Context was **lost** |
+| Entry `i` and exit `i` in the same trace | Context was propagated correctly |
 
-## Collaborate with your team
+The number is the expected answer, so the check needs no other bookkeeping. It is a black-box check and does not depend on the tracer's internals.
 
-* [Invite team members and collaborators](https://docs.gitlab.com/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/user/project/merge_requests/creating_merge_requests/)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/user/project/issues/managing_issues/#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+The tool itself does **not** read spans or compare them. You read the result in the tracing backend you are testing (Instana, OpenTelemetry collector, and so on).
 
-## Test and Deploy
+## Features
 
-Use the built-in continuous integration in GitLab.
+- **Web UI** at `/` where you choose a client, the number of requests (1 to 1000) and the number of concurrent workers (1 to 50). It sends the request numbers `1..N` in random order, spread across the workers, and shows success and failure counts and the average time.
+- **Pluggable clients.** Each client is a Spring component. Add one class and it appears in the UI automatically. The UI reads the list from the server, so it needs no rebuild.
+- **Self-contained.** Outbound calls go to a built-in `/external/{i}` endpoint by default, so no third-party site is involved.
 
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/topics/autodevops/requirements/)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ci/environments/protected_environments/)
+### Included clients
 
-***
+| Key | Client | Async mechanism |
+|---|---|---|
+| `vertX` | Vert.x Web Client 5.0.0 | `Future` callbacks |
+| `apache` | Apache HttpClient 5 | `FutureCallback` |
+| `jdk` | JDK `java.net.http.HttpClient` | `sendAsync` / `CompletableFuture` |
+| `okhttp` | OkHttp 4.12.0 | `Call.enqueue` |
+| `springWebClient` | Spring `WebClient` (Reactor Netty) | `Mono.subscribe` |
+| `jetty` | Jetty `HttpClient` | `send(Response.CompleteListener)` |
 
-# Editing this README
+## Requirements
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+- Java 17
+- Maven 3.9 or later
+- A tracer or APM agent attached to the JVM, to see the spans
 
-## Suggestions for a good README
+## Quick start
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+```bash
+git clone https://github.com/incrediblevichu/async-http-instrumentation-tester.git
+cd async-http-instrumentation-tester
+mvn package
+java -jar target/async-http-instrumentation-tester-0.0.1-SNAPSHOT.jar
+```
 
-## Name
-Choose a self-explaining name for your project.
+The application listens on port **12345**. Open http://localhost:12345/ for the UI.
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+To test a tracer, attach its agent when starting the application, for example:
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+```bash
+java -javaagent:/path/to/agent.jar -jar target/async-http-instrumentation-tester-0.0.1-SNAPSHOT.jar
+```
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+Then, in the UI, pick a client, choose the request count and workers, and press **Fire**. In your tracing backend, check that every number `i` has its entry span and exit span in the same trace.
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+## Configuration
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+| Property | Default | Meaning |
+|---|---|---|
+| `server.port` | `12345` | Port of the application |
+| `wizoz.exit-url` | `http://localhost:<server.port>/external/` | Base URL of the outbound calls. The number is appended. A trailing `/` is added if missing |
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+Example: `java -jar app.jar --wizoz.exit-url=http://my-service:8080/external/`
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+If you point the exit URL at another service, it must accept `GET {exitUrl}{i}`.
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+## API
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/fireRequest/{clientType}/{correlationId}` | Fire one async request. Returns 200, or 404 if the client key is unknown |
+| `GET /api/wizOzManagement/getAvailableClients` | Registered clients (key and display name) |
+| `GET /api/wizOzManagement/getDestinationUrl` | The exit URL in use |
+| `GET /external/{correlationId}` | Default exit target. Returns the number |
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+```bash
+curl http://localhost:12345/api/fireRequest/okhttp/42
+```
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+## Adding a new HTTP client
+
+1. Create a class that implements `WizOzAsyncClient` and annotate it with `@Component("yourKey")`:
+
+```java
+@Component("myClient")
+public class MyAsyncClient implements WizOzAsyncClient {
+
+    @Override
+    public void sendAsyncRequest(String exitUrl) {
+        // send the request asynchronously and return immediately
+    }
+
+    @Override
+    public String getClientGenericName() {
+        return "My Async Client";
+    }
+}
+```
+
+2. Add the client's library to `pom.xml`.
+3. Rebuild and restart the application. The client appears in the UI automatically.
+
+The key (`myClient`) is what you pass in `/api/fireRequest/{clientType}/{i}`.
+
+## Tests
+
+```bash
+mvn test
+```
+
+The tests check the tester itself, not any tracer. For every registered client, 200 request numbers are fired from 16 threads, and each number must reach the exit endpoint exactly once. They also cover the default exit URL, client registration and the 404 for an unknown client.
+
+## Limitations
+
+- A run only exercises the clients and load you choose. A run with no mismatch shows no problem for that case, not that propagation is correct everywhere.
+- Crossed context is more likely at higher concurrency. A small request count can pass by luck.
+- Results are read from your tracing backend. There is no built-in span comparison.
+- The UI is distributed as a compiled bundle in `src/main/resources/static`. Its source is not in this repository.
+- On macOS, Reactor Netty may log a harmless `MacOSDnsServerAddressStreamProvider` error at startup. It falls back to the system DNS resolver.
 
 ## License
-For open source projects, say how it is licensed.
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+GPL-3.0. See [LICENSE](LICENSE).
+
+## Author
+
+Vijay K
