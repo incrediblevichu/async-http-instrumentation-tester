@@ -8,26 +8,25 @@
 		<version>4.0.5</version>
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
-	<groupId>com.wizOz</groupId>
-	<artifactId>0</artifactId>
+	<groupId>com.wizoz</groupId>
+	<artifactId>async-http-instrumentation-tester</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name>WizOzAsyncTester</name>
-	<description/>
-	<url/>
+	<name>async-http-instrumentation-tester</name>
+	<description>Detects lost or crossed trace context in asynchronous HTTP clients by giving every request its own number.</description>
+	<url>https://github.com/incrediblevichu/async-http-instrumentation-tester</url>
 	<licenses>
-		<license/>
+		<license>
+			<name>GNU General Public License v3.0</name>
+			<url>https://www.gnu.org/licenses/gpl-3.0.html</url>
+		</license>
 	</licenses>
-	<developers>
-		<developer/>
-	</developers>
 	<scm>
-		<connection/>
-		<developerConnection/>
-		<tag/>
-		<url/>
+		<url>https://github.com/incrediblevichu/async-http-instrumentation-tester</url>
 	</scm>
 	<properties>
 		<java.version>17</java.version>
+		<vertx.version>5.0.0</vertx.version>
+		<okhttp.version>4.12.0</okhttp.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -41,30 +40,36 @@
 			<scope>test</scope>
 		</dependency>
 		
+		<!-- Async HTTP clients under test -->
 		<dependency>
-    <groupId>io.vertx</groupId>
-    <artifactId>vertx-core</artifactId>
-    <version>5.0.0</version>
-</dependency>
-<dependency>
-    <groupId>io.vertx</groupId>
-    <artifactId>vertx-web-client</artifactId>
-    <version>5.0.0</version>
-</dependency>
+			<groupId>io.vertx</groupId>
+			<artifactId>vertx-core</artifactId>
+			<version>${vertx.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>io.vertx</groupId>
+			<artifactId>vertx-web-client</artifactId>
+			<version>${vertx.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.httpcomponents.client5</groupId>
+			<artifactId>httpclient5</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>com.squareup.okhttp3</groupId>
+			<artifactId>okhttp</artifactId>
+			<version>${okhttp.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.eclipse.jetty</groupId>
+			<artifactId>jetty-client</artifactId>
+		</dependency>
+		<!-- Spring WebClient (Reactor Netty). The application stays a servlet (MVC) application. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-webflux</artifactId>
+		</dependency>
 
-<dependency>
-    <groupId>io.vertx</groupId>
-    <artifactId>vertx-launcher-legacy-cli</artifactId>
-    <version>5.0.0.CR1</version>
-</dependency>
-
-<!-- Source: https://mvnrepository.com/artifact/org.apache.httpcomponents.client5/httpclient5 -->
-<dependency>
-    <groupId>org.apache.httpcomponents.client5</groupId>
-    <artifactId>httpclient5</artifactId>
-    <scope>compile</scope>
-</dependency>
-		
 	</dependencies>
 
 	<build>

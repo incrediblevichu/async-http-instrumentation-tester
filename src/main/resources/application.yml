@@ -1,10 +1,15 @@
 server:
   port: 12345
-  
+
+# Base URL for the outbound requests. The correlation id is appended to it.
+# Default (when not set): http://localhost:<server.port>/external/
+# wizoz:
+#   exit-url: http://my-service.example:8080/external/
+
 logging:
   level:
     root: INFO
-    com.wizoz: DEBUG
+    com.wizoz: INFO
 
 spring:
   application:

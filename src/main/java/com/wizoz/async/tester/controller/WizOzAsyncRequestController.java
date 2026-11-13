@@ -23,7 +23,7 @@ public class WizOzAsyncRequestController {
 	}
 	
 	@GetMapping("/{clientType}/{correlationId}")
-	public ResponseEntity<?> fireRequest(@PathVariable(name = "clientType", required = true) String clientType,
+	public ResponseEntity<Void> fireRequest(@PathVariable(name = "clientType", required = true) String clientType,
 			@PathVariable(name = "correlationId",required = true) int correlationId){
 		clientService.fireRequest(clientType, correlationId);
 		return new ResponseEntity<>(HttpStatus.OK);
